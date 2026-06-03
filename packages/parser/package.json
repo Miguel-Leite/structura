@@ -1,0 +1,19 @@
+{
+  "name": "@structura/parser",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@structura/core": "*",
+    "@structura/graph": "*",
+    "@structura/ir": "*",
+    "@structura/config": "*",
+    "ts-morph": "^25.0.0"
+  }
+}
