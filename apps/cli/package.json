@@ -1,0 +1,21 @@
+{
+  "name": "structura",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "structura": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@structura/core": "*",
+    "@structura/config": "*",
+    "@structura/ir": "*",
+    "commander": "^13.0.0",
+    "@clack/prompts": "^0.10.0",
+    "picocolors": "^1.1.0"
+  }
+}
