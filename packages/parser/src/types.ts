@@ -53,4 +53,5 @@ export interface ParserOptions {
   projectRoot: string
   ir: ArchitectureIR
   tsConfigPath?: string
+  tsConfigPaths?: string[]
 }

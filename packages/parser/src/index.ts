@@ -1,4 +1,5 @@
 export { parseProject } from "./parser.js"
+export { findTsConfigs } from "./workspace.js"
 export type {
   ParsedSource,
   Import,

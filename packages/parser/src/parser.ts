@@ -2,6 +2,7 @@ import { Project } from "ts-morph"
 import { existsSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import type { ParsedSource, Import, Export, Declaration, ImportGraph, ImportEdge, ParserOptions } from "./types.js"
+import { findTsConfigs } from "./workspace.js"
 
 function classifyImport(
   source: string,
@@ -33,26 +34,44 @@ function buildDomainMap(ir: ParserOptions["ir"]): Map<string, string> {
   return map
 }
 
-export function parseProject(options: ParserOptions): {
+function mergeGraphs(target: ImportGraph, source: ImportGraph): void {
+  for (const edge of source.edges) {
+    target.edges.push(edge)
+  }
+
+  for (const [key, imports] of source.nodeImports) {
+    if (!target.nodeImports.has(key)) {
+      target.nodeImports.set(key, imports)
+    }
+  }
+
+  for (const [key, imports] of source.domainImports) {
+    if (!target.domainImports.has(key)) {
+      target.domainImports.set(key, imports)
+    }
+  }
+
+  for (const [dep, files] of source.externalDependencies) {
+    const existing = target.externalDependencies.get(dep) ?? new Set()
+    for (const f of files) existing.add(f)
+    target.externalDependencies.set(dep, existing)
+  }
+}
+
+function parseWithTsConfig(
+  tsConfigPath: string,
+  projectRoot: string,
+  ir: ParserOptions["ir"],
+  domainMap: Map<string, string>,
+): {
   sources: Map<string, ParsedSource>
   graph: ImportGraph
 } {
-  const { projectRoot, ir } = options
   const sources = new Map<string, ParsedSource>()
   const edges: ImportEdge[] = []
   const nodeImports = new Map<string, Import[]>()
   const domainImports = new Map<string, Import[]>()
   const externalDependencies = new Map<string, Set<string>>()
-  const domainMap = buildDomainMap(ir)
-
-  const tsConfigPath = options.tsConfigPath ?? join(projectRoot, "tsconfig.json")
-
-  if (!existsSync(tsConfigPath)) {
-    return {
-      sources,
-      graph: { edges, nodeImports, domainImports, externalDependencies },
-    }
-  }
 
   const project = new Project({
     tsConfigFilePath: tsConfigPath,
@@ -206,5 +225,59 @@ export function parseProject(options: ParserOptions): {
   return {
     sources,
     graph: { edges, nodeImports, domainImports, externalDependencies },
+  }
+}
+
+export function parseProject(options: ParserOptions): {
+  sources: Map<string, ParsedSource>
+  graph: ImportGraph
+} {
+  const { projectRoot, ir } = options
+  const emptyResult = () => ({
+    sources: new Map<string, ParsedSource>(),
+    graph: { edges: [], nodeImports: new Map(), domainImports: new Map(), externalDependencies: new Map() } as ImportGraph,
+  })
+
+  let tsConfigPaths: string[]
+
+  if (options.tsConfigPaths && options.tsConfigPaths.length > 0) {
+    tsConfigPaths = options.tsConfigPaths
+  } else if (options.tsConfigPath) {
+    tsConfigPaths = [options.tsConfigPath]
+  } else {
+    tsConfigPaths = findTsConfigs(projectRoot)
+  }
+
+  if (tsConfigPaths.length === 0) {
+    return emptyResult()
+  }
+
+  const domainMap = buildDomainMap(ir)
+
+  const allSources = new Map<string, ParsedSource>()
+  const mergedGraph: ImportGraph = {
+    edges: [],
+    nodeImports: new Map(),
+    domainImports: new Map(),
+    externalDependencies: new Map(),
+  }
+
+  for (const tsConfigPath of tsConfigPaths) {
+    if (!existsSync(tsConfigPath)) continue
+
+    const { sources, graph } = parseWithTsConfig(tsConfigPath, projectRoot, ir, domainMap)
+
+    for (const [key, source] of sources) {
+      if (!allSources.has(key)) {
+        allSources.set(key, source)
+      }
+    }
+
+    mergeGraphs(mergedGraph, graph)
+  }
+
+  return {
+    sources: allSources,
+    graph: mergedGraph,
   }
 }

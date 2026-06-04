@@ -13,7 +13,8 @@ export const checkCommand = createCommand("check")
   .option("-s, --strict", "Treat warnings as errors")
   .option("-v, --verbose", "Show detailed output")
   .option("--auto", "Auto-generate config if missing (non-interactive)")
-  .action(async (options: { strict?: boolean; verbose?: boolean; auto?: boolean }) => {
+  .option("--tsconfig <paths...>", "One or more tsconfig.json paths for monorepos")
+  .action(async (options: { strict?: boolean; verbose?: boolean; auto?: boolean; tsconfig?: string[] }) => {
     p.intro(pc.bold("structura check"))
     const s = p.spinner()
 
@@ -33,6 +34,7 @@ export const checkCommand = createCommand("check")
     const parseResult = parseProject({
       projectRoot: process.cwd(),
       ir,
+      tsConfigPaths: options.tsconfig,
     })
     s.stop(`Parsed ${parseResult.sources.size} source files`)
 

@@ -46,6 +46,12 @@ export const StructuraConfigSchema = z.object({
       autonomy: z.enum(["constrained", "guided", "supervised"]),
     })
     .optional(),
+  features: z
+    .object({
+      drift_detection: z.boolean().optional(),
+      ai_governance: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 export type ValidatedConfig = z.infer<typeof StructuraConfigSchema>

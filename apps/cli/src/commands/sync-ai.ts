@@ -276,7 +276,7 @@ function generateAiderConventions(ir: ArchitectureIR): string {
   return lines.join("\n")
 }
 
-const generators: Generator[] = [
+export const generators: Generator[] = [
   {
     id: "cursor",
     label: ".cursorrules",
@@ -438,3 +438,49 @@ export const syncAiCommand = createCommand("sync-ai")
 
     p.outro(pc.green("✔") + " AI sync complete")
   })
+
+export function writeAiFiles(
+  ir: ArchitectureIR,
+  root: string,
+  options?: { force?: boolean },
+): { label: string; path: string }[] {
+  const written: { label: string; path: string }[] = []
+
+  for (const gen of generators) {
+    const path = gen.filePath(root)
+    const dir = path.includes("\\") ? path.substring(0, path.lastIndexOf("\\"))
+      : path.includes("/") ? path.substring(0, path.lastIndexOf("/"))
+      : ""
+
+    const fileExists = existsSync(path)
+
+    if (fileExists && !options?.force) {
+      if (gen.merge) {
+        const existing = readFileSync(path, "utf-8")
+        const generated = gen.generate(ir)
+        const merged = gen.merge(existing, generated)
+        writeFileSync(path, merged, "utf-8")
+        written.push({ label: gen.label, path })
+      }
+      continue
+    }
+
+    if (dir && !existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
+    }
+
+    let content: string
+    if (fileExists && gen.merge) {
+      content = gen.merge(readFileSync(path, "utf-8"), gen.generate(ir))
+    } else if (gen.merge) {
+      content = gen.merge("", gen.generate(ir))
+    } else {
+      content = gen.generate(ir)
+    }
+
+    writeFileSync(path, content, "utf-8")
+    written.push({ label: gen.label, path })
+  }
+
+  return written
+}

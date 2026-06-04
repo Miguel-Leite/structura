@@ -10,7 +10,8 @@ export const driftCommand = createCommand("drift")
   .description("Detect architectural drift between defined architecture and real code")
   .option("-v, --verbose", "Show detailed output")
   .option("--auto", "Auto-generate config if missing (non-interactive)")
-  .action(async (options: { verbose?: boolean; auto?: boolean }) => {
+  .option("--tsconfig <paths...>", "One or more tsconfig.json paths for monorepos")
+  .action(async (options: { verbose?: boolean; auto?: boolean; tsconfig?: string[] }) => {
     p.intro(pc.bold("structura drift"))
     const s = p.spinner()
 
@@ -26,6 +27,7 @@ export const driftCommand = createCommand("drift")
     const parseResult = parseProject({
       projectRoot: process.cwd(),
       ir,
+      tsConfigPaths: options.tsconfig,
     })
     s.stop(`Parsed ${parseResult.sources.size} source files`)
 

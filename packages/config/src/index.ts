@@ -3,6 +3,7 @@ export type {
   DomainConfig,
   RuleConfig,
   AIConfig,
+  FeaturesConfig,
   ArchitectureStyle,
   AIAutonomyLevel,
 } from "./types.js"

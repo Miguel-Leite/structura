@@ -22,6 +22,11 @@ export interface AIConfig {
   autonomy: AIAutonomyLevel
 }
 
+export interface FeaturesConfig {
+  drift_detection?: boolean
+  ai_governance?: boolean
+}
+
 export interface StructuraConfig {
   project?: {
     name: string
@@ -40,4 +45,5 @@ export interface StructuraConfig {
   domains: DomainConfig[]
   rules?: RuleConfig
   ai?: AIConfig
+  features?: FeaturesConfig
 }
