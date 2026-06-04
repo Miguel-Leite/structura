@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { DependencyGraph } from "./index.js"
+import { DependencyGraph, toDot, toJson } from "./index.js"
 import type { ArchitectureIR } from "@structura/ir"
 
 describe("DependencyGraph", () => {
@@ -115,6 +115,31 @@ describe("DependencyGraph", () => {
     const extraEdge = diffs.find((d) => d.type === "extra")
     expect(extraEdge).toBeDefined()
     expect(extraEdge?.sourceId).toBe("a")
+  })
+
+  it("should generate DOT output", () => {
+    const graph = new DependencyGraph()
+    graph.addNode({ id: "a", type: "domain", label: "A" })
+    graph.addNode({ id: "b", type: "domain", label: "B" })
+    graph.addEdge({ id: "1", sourceId: "a", targetId: "b", kind: "allowed", weight: 1 })
+
+    const dot = toDot(graph)
+    expect(dot).toContain("digraph structura")
+    expect(dot).toContain('"a"')
+    expect(dot).toContain('"b"')
+    expect(dot).toContain('"a" -> "b"')
+  })
+
+  it("should generate JSON output", () => {
+    const graph = new DependencyGraph()
+    graph.addNode({ id: "x", type: "domain", label: "X" })
+    graph.addEdge({ id: "1", sourceId: "x", targetId: "x", kind: "dependency", weight: 1 })
+
+    const json = toJson(graph)
+    const parsed = JSON.parse(json)
+    expect(parsed.nodes).toHaveLength(1)
+    expect(parsed.edges).toHaveLength(1)
+    expect(parsed.nodes[0]?.id).toBe("x")
   })
 
   it("should build graph from IR", () => {
