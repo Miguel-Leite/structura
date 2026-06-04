@@ -145,7 +145,11 @@ export function generateConfigYml(answers: InitAnswers): string {
   lines.push("ai:")
   lines.push(`  autonomy: ${answers.autonomy}`)
   if (answers.aiAgents.length > 0) {
-    lines.push(`  agents: [${answers.aiAgents.join(", ")}]`)
+    lines.push(`  agents:`)
+    for (const agent of answers.aiAgents) {
+      lines.push(`    - id: ${agent}`)
+      lines.push(`      autonomy: ${answers.autonomy}`)
+    }
   }
   lines.push("  rules:")
   lines.push(`    enforce_architecture: ${answers.enforceArchitecture ?? true}`)
