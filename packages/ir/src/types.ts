@@ -1,9 +1,19 @@
 import type { Severity } from "@structura/core"
+import type {
+  ProjectType,
+  DesignPhilosophy,
+  StylingSystem,
+  ComponentArchitecture,
+  ComponentOrganization,
+  FrontendType,
+  AIAgentConfig,
+} from "@structura/config"
 
 export interface IRMeta {
   version: string
   projectName: string
   projectStyle: "monolith" | "modular-monolith" | "microservices"
+  projectType?: ProjectType
   createdAt: string
 }
 
@@ -36,7 +46,52 @@ export interface IRRuleConfig {
 
 export interface AIPolicy {
   domainId: string
-  autonomy: "constrained" | "guided" | "supervised"
+  autonomy: string
+}
+
+export interface UIDesignIR {
+  projectType: ProjectType
+  designPhilosophy?: DesignPhilosophy
+  designConstraints?: {
+    avoidGenericAiLayouts?: boolean
+    avoidDefaultDashboardPatterns?: boolean
+    avoidRepetitiveCardGrids?: boolean
+  }
+  stylingSystem?: StylingSystem
+  layout?: {
+    preferAsymmetry?: boolean
+    enforceVisualHierarchy?: boolean
+  }
+  componentArchitecture?: ComponentArchitecture
+  componentOrganization?: ComponentOrganization
+  componentRules?: {
+    separateLogicAndUi?: boolean
+    enforceAccessibility?: boolean
+    preventMassiveComponents?: boolean
+    enforceVariantConsistency?: boolean
+    maxLines?: number
+  }
+  designSystem?: {
+    enabled?: boolean
+    tokens?: boolean
+    variants?: boolean
+    motion?: boolean
+    theme?: boolean
+    accessibility?: boolean
+    slots?: boolean
+    responsive?: boolean
+  }
+  frontendType?: FrontendType
+}
+
+export interface MultiAgentPolicy {
+  agents: AIAgentConfig[]
+  autonomy: string
+  rules: {
+    enforceArchitecture: boolean
+    preserveDesignIdentity: boolean
+    preventBoundaryViolations: boolean
+  }
 }
 
 export interface ArchitectureIR {
@@ -45,4 +100,6 @@ export interface ArchitectureIR {
   dependencies: Dependency[]
   rules: IRRuleConfig[]
   aiPolicies: AIPolicy[]
+  uiDesign?: UIDesignIR
+  multiAgent?: MultiAgentPolicy
 }

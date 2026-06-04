@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest"
 import { ForbiddenCrossDomainImportRule } from "./forbidden-cross-domain-import.js"
 import { MaxFileLinesRule } from "./max-file-lines.js"
 import { NoCircularDependenciesRule } from "./no-circular-dependencies.js"
+import { SeparateLogicAndUiRule } from "./separate-logic-and-ui.js"
+import { PreventMassiveComponentsRule } from "./prevent-massive-components.js"
+import { ComponentNamingConventionRule } from "./component-naming-convention.js"
 import { registerBuiltinRules } from "./register.js"
 import { Registry } from "@structura/rules-engine"
 import type { ValidationContext } from "@structura/rules-engine"
@@ -138,13 +141,209 @@ describe("NoCircularDependenciesRule", () => {
   })
 })
 
+describe("SeparateLogicAndUiRule", () => {
+  it("should detect business logic imports in component files", () => {
+    const rule = new SeparateLogicAndUiRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/UserCard.tsx", {
+          filePath: "src/components/UserCard.tsx",
+          lineCount: 20,
+          domainId: "ui",
+          imports: [
+            { source: "@/services/user", targetDomainId: "billing", line: 1 },
+          ],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.some((r) => !r.passed)).toBe(true)
+  })
+
+  it("should pass when component only imports UI code", () => {
+    const rule = new SeparateLogicAndUiRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/Button.tsx", {
+          filePath: "src/components/Button.tsx",
+          lineCount: 15,
+          domainId: "ui",
+          imports: [
+            { source: "./Button.module.css", targetDomainId: undefined, line: 1 },
+            { source: "react", targetDomainId: undefined, line: 2 },
+          ],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+
+  it("should ignore non-component files", () => {
+    const rule = new SeparateLogicAndUiRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/services/user.ts", {
+          filePath: "src/services/user.ts",
+          lineCount: 10,
+          domainId: "billing",
+          imports: [
+            { source: "@/database/connection", targetDomainId: undefined, line: 1 },
+          ],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+})
+
+describe("PreventMassiveComponentsRule", () => {
+  it("should detect component files exceeding line limit", () => {
+    const rule = new PreventMassiveComponentsRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/HugeComponent.tsx", {
+          filePath: "src/components/HugeComponent.tsx",
+          lineCount: 300,
+          domainId: "ui",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.some((r) => !r.passed)).toBe(true)
+  })
+
+  it("should pass when component files are within limit", () => {
+    const rule = new PreventMassiveComponentsRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/SmallComponent.tsx", {
+          filePath: "src/components/SmallComponent.tsx",
+          lineCount: 50,
+          domainId: "ui",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+
+  it("should ignore non-component files", () => {
+    const rule = new PreventMassiveComponentsRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/services/huge.ts", {
+          filePath: "src/services/huge.ts",
+          lineCount: 500,
+          domainId: "billing",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+})
+
+describe("ComponentNamingConventionRule", () => {
+  it("should detect non-PascalCase component files", () => {
+    const rule = new ComponentNamingConventionRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/button.tsx", {
+          filePath: "src/components/button.tsx",
+          lineCount: 10,
+          domainId: "ui",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.some((r) => !r.passed)).toBe(true)
+  })
+
+  it("should pass when component files use PascalCase", () => {
+    const rule = new ComponentNamingConventionRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/components/Button.tsx", {
+          filePath: "src/components/Button.tsx",
+          lineCount: 10,
+          domainId: "ui",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+
+  it("should ignore non-component files", () => {
+    const rule = new ComponentNamingConventionRule()
+    const ctx: ValidationContext = {
+      ir: baseIR,
+      graph: makeGraph(true),
+      projectRoot: "/test",
+      sources: new Map([
+        ["src/utils/helper.ts", {
+          filePath: "src/utils/helper.ts",
+          lineCount: 10,
+          domainId: "shared",
+          imports: [],
+        }],
+      ]),
+    }
+
+    const results = rule.validate(ctx)
+    expect(results.every((r) => r.passed)).toBe(true)
+  })
+})
+
 describe("registerBuiltinRules", () => {
   it("should register all built-in rules", () => {
     const registry = new Registry()
     registerBuiltinRules(registry)
-    expect(registry.size).toBe(3)
+    expect(registry.size).toBe(6)
     expect(registry.get("forbidden-cross-domain-import")).toBeDefined()
     expect(registry.get("max-file-lines")).toBeDefined()
     expect(registry.get("no-circular-dependencies")).toBeDefined()
+    expect(registry.get("separate-logic-and-ui")).toBeDefined()
+    expect(registry.get("prevent-massive-components")).toBeDefined()
+    expect(registry.get("component-naming-convention")).toBeDefined()
   })
 })

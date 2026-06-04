@@ -1,0 +1,1 @@
+{"root":["./src/component-naming-convention.ts","./src/forbidden-cross-domain-import.ts","./src/index.test.ts","./src/index.ts","./src/max-file-lines.ts","./src/no-circular-dependencies.ts","./src/prevent-massive-components.ts","./src/register.ts","./src/separate-logic-and-ui.ts"],"version":"5.9.3"}

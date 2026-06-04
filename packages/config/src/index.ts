@@ -6,6 +6,22 @@ export type {
   FeaturesConfig,
   ArchitectureStyle,
   AIAutonomyLevel,
+  ProjectType,
+  DesignPhilosophy,
+  StylingSystem,
+  ComponentArchitecture,
+  ComponentOrganization,
+  FrontendType,
+  AIAgentId,
+  DesignConfig,
+  DesignConstraints,
+  UIConfig,
+  LayoutConfig,
+  ComponentConfig,
+  ComponentRulesConfig,
+  DesignSystemConfig,
+  AIRulesConfig,
+  AIAgentConfig,
 } from "./types.js"
 export { StructuraConfigSchema } from "./schema.js"
 export { readConfig, findConfigPath } from "./parser.js"

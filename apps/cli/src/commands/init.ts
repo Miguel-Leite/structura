@@ -5,14 +5,49 @@ import { createCommand } from "commander"
 import pc from "picocolors"
 import { scanProject } from "./init-scanner.js"
 
+function hasFrontend(type: string): boolean {
+  return ["frontend-application", "fullstack-platform", "ai-product", "saas"].includes(type)
+}
+
+function hasUI(type: string): boolean {
+  return hasFrontend(type) || type === "ui-infrastructure"
+}
+
+function hasBackend(type: string): boolean {
+  return ["backend-api", "fullstack-platform", "ai-product", "saas", "infrastructure-tool"].includes(type)
+}
+
 export interface InitAnswers {
   projectName: string
+  projectType: string
   style: string
   domains: { name: string; path: string; canAccess?: string[]; cannotAccess?: string[] }[]
-  autonomy: string
+
   frontend?: string
+  frontendType?: string
   backend?: string
   orm?: string
+
+  stylingSystem?: string
+  designPhilosophy?: string
+  avoidGenericLayouts?: boolean
+  componentArchitecture?: string
+  componentOrganization?: string
+  separateLogicAndUi?: boolean
+  enforceAccessibility?: boolean
+  preventMassiveComponents?: boolean
+  enforceVariantConsistency?: boolean
+  designSystemEnabled?: boolean
+  designTokens?: boolean
+  designVariants?: boolean
+  designMotion?: boolean
+  designTheme?: boolean
+
+  aiAgents: string[]
+  autonomy: string
+  enforceArchitecture?: boolean
+  preserveDesignIdentity?: boolean
+
   enforceBoundaries: boolean
   driftDetection: boolean
   aiGovernance: boolean
@@ -25,19 +60,61 @@ export function generateConfigYml(answers: InitAnswers): string {
     "",
     "project:",
     `  name: ${answers.projectName}`,
+    `  type: ${answers.projectType}`,
     "",
     "architecture:",
     `  style: ${answers.style}`,
     "",
   ]
 
-  if (answers.frontend) {
-    lines.push("frontend:")
-    lines.push(`  framework: ${answers.frontend}`)
+  if (hasUI(answers.projectType)) {
+    if (answers.designPhilosophy) {
+      lines.push("design:")
+      lines.push(`  philosophy: ${answers.designPhilosophy}`)
+      if (answers.avoidGenericLayouts) {
+        lines.push("  constraints:")
+        lines.push(`    avoid_generic_ai_layouts: ${answers.avoidGenericLayouts}`)
+      }
+      lines.push("")
+    }
+
+    lines.push("ui:")
+    if (answers.stylingSystem) {
+      lines.push(`  styling: ${answers.stylingSystem}`)
+    }
+    lines.push("")
+
+    lines.push("components:")
+    if (answers.componentArchitecture) {
+      lines.push(`  architecture: ${answers.componentArchitecture}`)
+    }
+    if (answers.componentOrganization) {
+      lines.push(`  organization: ${answers.componentOrganization}`)
+    }
+    lines.push("  rules:")
+    lines.push(`    separate_logic_and_ui: ${answers.separateLogicAndUi ?? false}`)
+    lines.push(`    enforce_accessibility: ${answers.enforceAccessibility ?? false}`)
+    lines.push(`    prevent_massive_components: ${answers.preventMassiveComponents ?? false}`)
+    lines.push(`    enforce_variant_consistency: ${answers.enforceVariantConsistency ?? false}`)
+    lines.push("")
+
+    lines.push("design_system:")
+    lines.push(`  enabled: ${answers.designSystemEnabled ?? false}`)
+    lines.push(`  tokens: ${answers.designTokens ?? false}`)
+    lines.push(`  variants: ${answers.designVariants ?? false}`)
+    lines.push(`  motion: ${answers.designMotion ?? false}`)
+    lines.push(`  theme: ${answers.designTheme ?? false}`)
     lines.push("")
   }
 
-  if (answers.backend) {
+  if (hasFrontend(answers.projectType) && answers.frontend) {
+    lines.push("frontend:")
+    lines.push(`  framework: ${answers.frontend}`)
+    lines.push(`  type: ${answers.frontendType ?? "application"}`)
+    lines.push("")
+  }
+
+  if (hasBackend(answers.projectType) && answers.backend) {
     lines.push("backend:")
     lines.push(`  framework: ${answers.backend}`)
     if (answers.orm) {
@@ -47,7 +124,6 @@ export function generateConfigYml(answers: InitAnswers): string {
   }
 
   lines.push("domains:")
-
   for (const domain of answers.domains) {
     lines.push(`  - name: ${domain.name}`)
     lines.push(`    path: ${domain.path}`)
@@ -58,7 +134,6 @@ export function generateConfigYml(answers: InitAnswers): string {
       lines.push(`    cannotAccess: [${domain.cannotAccess.join(", ")}]`)
     }
   }
-
   lines.push("")
 
   if (answers.enforceBoundaries) {
@@ -69,6 +144,12 @@ export function generateConfigYml(answers: InitAnswers): string {
 
   lines.push("ai:")
   lines.push(`  autonomy: ${answers.autonomy}`)
+  if (answers.aiAgents.length > 0) {
+    lines.push(`  agents: [${answers.aiAgents.join(", ")}]`)
+  }
+  lines.push("  rules:")
+  lines.push(`    enforce_architecture: ${answers.enforceArchitecture ?? true}`)
+  lines.push(`    preserve_design_identity: ${answers.preserveDesignIdentity ?? true}`)
   lines.push("")
 
   lines.push("features:")
@@ -89,6 +170,219 @@ async function askAllQuestions(
   })
   if (p.isCancel(projectName)) return process.exit(0) as never
 
+  const projectType = await p.select({
+    message: "What are you building?",
+    options: [
+      { value: "frontend-application", label: "Frontend Application", hint: "SPA, website, dashboard" },
+      { value: "backend-api", label: "Backend API", hint: "REST, GraphQL, gRPC API" },
+      { value: "fullstack-platform", label: "Fullstack Platform", hint: "Frontend + Backend" },
+      { value: "ai-product", label: "AI Product", hint: "AI-native application" },
+      { value: "saas", label: "SaaS", hint: "Multi-tenant cloud service" },
+      { value: "ui-infrastructure", label: "UI Infrastructure", hint: "Design System, UI Library, Headless UI" },
+      { value: "infrastructure-tool", label: "Infrastructure Tool", hint: "CLI, dev tool, library" },
+    ],
+  })
+  if (p.isCancel(projectType)) return process.exit(0) as never
+
+  const pt = projectType as string
+
+  let frontendVal: string | undefined
+  let frontendTypeVal: string | undefined
+  if (hasFrontend(pt)) {
+    const result = await p.select({
+      message: "Frontend framework:",
+      options: [
+        { value: "nextjs", label: "Next.js" },
+        { value: "react", label: "React (Vite)" },
+        { value: "vue", label: "Vue" },
+        { value: "svelte", label: "Svelte" },
+        { value: "angular", label: "Angular" },
+      ],
+    })
+    if (p.isCancel(result)) return process.exit(0) as never
+    frontendVal = result as string
+  }
+
+  let stylingSystemVal: string | undefined
+  let designPhilosophyVal: string | undefined
+  let avoidGenericLayoutsVal = false
+  let componentArchVal: string | undefined
+  let componentOrgVal: string | undefined
+  let separateLogicVal = false
+  let enforceA11yVal = false
+  let preventMassiveVal = false
+  let enforceVariantsVal = false
+  let dsEnabledVal = false
+  let dsTokensVal = false
+  let dsVariantsVal = false
+  let dsMotionVal = false
+  let dsThemeVal = false
+
+  if (hasUI(pt)) {
+    if (!hasFrontend(pt)) {
+      frontendTypeVal = "ui-infrastructure"
+    }
+
+    const styling = await p.select({
+      message: "Which styling system should be primary?",
+      options: [
+        { value: "tailwindcss", label: "TailwindCSS" },
+        { value: "css-modules", label: "CSS Modules" },
+        { value: "pandacss", label: "PandaCSS" },
+        { value: "unocss", label: "UnoCSS" },
+        { value: "styled-components", label: "Styled Components" },
+        { value: "vanilla-extract", label: "Vanilla Extract" },
+      ],
+    })
+    if (p.isCancel(styling)) return process.exit(0) as never
+    stylingSystemVal = styling as string
+
+    const philosophy = await p.select({
+      message: "What design philosophy should the project follow?",
+      options: [
+        { value: "minimal", label: "Minimal", hint: "Clean, simple, reduced" },
+        { value: "editorial", label: "Editorial", hint: "Content-first, typography-driven" },
+        { value: "premium", label: "Premium", hint: "Polished, refined, high-end" },
+        { value: "brutalist", label: "Brutalist", hint: "Raw, bold, unconventional" },
+        { value: "enterprise", label: "Enterprise", hint: "Practical, scalable, consistent" },
+        { value: "custom", label: "Custom", hint: "Define your own" },
+      ],
+    })
+    if (p.isCancel(philosophy)) return process.exit(0) as never
+    designPhilosophyVal = philosophy as string
+
+    const avoidGeneric = await p.confirm({
+      message: "Should AI-generated generic layouts be avoided?",
+      initialValue: true,
+    })
+    if (p.isCancel(avoidGeneric)) return process.exit(0) as never
+    avoidGenericLayoutsVal = avoidGeneric as boolean
+
+    if (hasFrontend(pt)) {
+      const ft = await p.select({
+        message: "Frontend type:",
+        options: [
+          { value: "application", label: "Application", hint: "Final product — routes, pages, flows" },
+          { value: "ui-infrastructure", label: "UI Infrastructure", hint: "Design System, Component Library" },
+        ],
+      })
+      if (p.isCancel(ft)) return process.exit(0) as never
+      frontendTypeVal = ft as string
+    }
+
+    const compArch = await p.select({
+      message: "What component architecture should be used?",
+      options: [
+        { value: "compound-components", label: "Compound Components", hint: "Recommended — flexible, composable" },
+        { value: "headless", label: "Headless", hint: "Logic without UI — full control" },
+        { value: "atomic-design", label: "Atomic Design", hint: "Atoms → Molecules → Organisms" },
+        { value: "feature-based", label: "Feature-based", hint: "Components grouped by feature" },
+        { value: "semantic-components", label: "Semantic Components", hint: "Named by meaning, not appearance" },
+        { value: "design-system", label: "Design System", hint: "Token-driven, design-controlled" },
+      ],
+    })
+    if (p.isCancel(compArch)) return process.exit(0) as never
+    componentArchVal = compArch as string
+
+    const compOrg = await p.select({
+      message: "How should components be organized?",
+      options: [
+        { value: "by-semantic-responsibility", label: "By semantic responsibility", hint: "Recommended — what the component means" },
+        { value: "by-feature", label: "By feature", hint: "Grouped by product feature" },
+        { value: "by-domain", label: "By domain", hint: "Grouped by business domain" },
+        { value: "by-ui-layer", label: "By UI layer", hint: "Atoms, molecules, organisms" },
+        { value: "by-design-tokens", label: "By design tokens", hint: "Grouped by visual properties" },
+      ],
+    })
+    if (p.isCancel(compOrg)) return process.exit(0) as never
+    componentOrgVal = compOrg as string
+
+    const separateLogic = await p.confirm({
+      message: "Enforce strict separation between logic and UI?",
+      initialValue: true,
+    })
+    if (p.isCancel(separateLogic)) return process.exit(0) as never
+    separateLogicVal = separateLogic as boolean
+
+    const a11y = await p.confirm({
+      message: "Enforce accessibility rules?",
+      initialValue: true,
+    })
+    if (p.isCancel(a11y)) return process.exit(0) as never
+    enforceA11yVal = a11y as boolean
+
+    const massive = await p.confirm({
+      message: "Prevent massive components? (max 150 lines)",
+      initialValue: true,
+    })
+    if (p.isCancel(massive)) return process.exit(0) as never
+    preventMassiveVal = massive as boolean
+
+    const variants = await p.confirm({
+      message: "Enforce variant consistency?",
+      initialValue: false,
+    })
+    if (p.isCancel(variants)) return process.exit(0) as never
+    enforceVariantsVal = variants as boolean
+
+    const useDS = await p.confirm({
+      message: "Will the project include a Design System?",
+      initialValue: pt === "ui-infrastructure",
+    })
+    if (p.isCancel(useDS)) return process.exit(0) as never
+    dsEnabledVal = useDS as boolean
+
+    if (dsEnabledVal) {
+      const tokens = await p.confirm({ message: "Include Design Tokens?", initialValue: true })
+      if (p.isCancel(tokens)) return process.exit(0) as never
+      dsTokensVal = tokens as boolean
+
+      const dsv = await p.confirm({ message: "Include Variant System?", initialValue: true })
+      if (p.isCancel(dsv)) return process.exit(0) as never
+      dsVariantsVal = dsv as boolean
+
+      const motion = await p.confirm({ message: "Include Motion Rules?", initialValue: false })
+      if (p.isCancel(motion)) return process.exit(0) as never
+      dsMotionVal = motion as boolean
+
+      const theme = await p.confirm({ message: "Include Theme System?", initialValue: true })
+      if (p.isCancel(theme)) return process.exit(0) as never
+      dsThemeVal = theme as boolean
+    }
+  }
+
+  let backendVal: string | undefined
+  let ormVal: string | undefined
+  if (hasBackend(pt)) {
+    const result = await p.select({
+      message: "Backend framework:",
+      options: [
+        { value: "", label: "None", hint: "No backend" },
+        { value: "nestjs", label: "NestJS" },
+        { value: "express", label: "Express" },
+        { value: "fastify", label: "Fastify" },
+        { value: "hono", label: "Hono" },
+      ],
+    })
+    if (p.isCancel(result)) return process.exit(0) as never
+    backendVal = result as string || undefined
+
+    if (backendVal) {
+      const ormResult = await p.select({
+        message: "ORM:",
+        options: [
+          { value: "", label: "None" },
+          { value: "prisma", label: "Prisma" },
+          { value: "drizzle", label: "Drizzle" },
+          { value: "typeorm", label: "TypeORM" },
+          { value: "sequelize", label: "Sequelize" },
+        ],
+      })
+      if (p.isCancel(ormResult)) return process.exit(0) as never
+      ormVal = (ormResult as string) || undefined
+    }
+  }
+
   const style = await p.select({
     message: "Architecture style:",
     options: [
@@ -106,42 +400,6 @@ async function askAllQuestions(
     ],
   })
   if (p.isCancel(style)) return process.exit(0) as never
-
-  const frontendVal = await p.select({
-    message: "Frontend framework:",
-    options: [
-      { value: "", label: "None", hint: "No frontend" },
-      { value: "nextjs", label: "Next.js" },
-      { value: "react", label: "React (Vite)" },
-    ],
-  })
-  if (p.isCancel(frontendVal)) return process.exit(0) as never
-
-  const backendVal = await p.select({
-    message: "Backend framework:",
-    options: [
-      { value: "", label: "None", hint: "No backend" },
-      { value: "nestjs", label: "NestJS" },
-      { value: "express", label: "Express" },
-    ],
-  })
-  if (p.isCancel(backendVal)) return process.exit(0) as never
-
-  let ormVal = ""
-  if (backendVal) {
-    const ormResult = await p.select({
-      message: "ORM:",
-      options: [
-        { value: "", label: "None" },
-        { value: "prisma", label: "Prisma" },
-        { value: "drizzle", label: "Drizzle" },
-        { value: "typeorm", label: "TypeORM" },
-        { value: "sequelize", label: "Sequelize" },
-      ],
-    })
-    if (p.isCancel(ormResult)) return process.exit(0) as never
-    ormVal = ormResult as string
-  }
 
   s.start("Scanning project structure")
   const scanResult = scanProject(process.cwd())
@@ -242,24 +500,69 @@ async function askAllQuestions(
   })
   if (p.isCancel(aiGovernance)) return process.exit(0) as never
 
-  const autonomy = await p.select({
-    message: "AI agent autonomy level:",
+  const aiAgents = await p.multiselect({
+    message: "Which AI agents will be used in this project?",
     options: [
-      { value: "constrained", label: "Constrained", hint: "Strict rules — recommended" },
-      { value: "guided", label: "Guided", hint: "Can suggest but not violate" },
-      { value: "supervised", label: "Supervised", hint: "Experimental — free but reports violations" },
+      { value: "opencode", label: "OpenCode" },
+      { value: "cursor", label: "Cursor" },
+      { value: "claude", label: "Claude" },
+      { value: "copilot", label: "GitHub Copilot" },
+      { value: "continue", label: "Continue" },
+    ],
+    required: true,
+  })
+  if (p.isCancel(aiAgents)) return process.exit(0) as never
+
+  const autonomy = await p.select({
+    message: "How autonomous should AI agents be?",
+    options: [
+      { value: "strict", label: "Strict", hint: "AI cannot modify architecture or design" },
+      { value: "constrained", label: "Constrained", hint: "AI follows rules strictly — recommended" },
+      { value: "hybrid", label: "Hybrid", hint: "AI can suggest but not violate" },
+      { value: "autonomous", label: "Autonomous", hint: "AI is free but reports violations" },
     ],
   })
   if (p.isCancel(autonomy)) return process.exit(0) as never
 
+  const enforceArch = await p.confirm({
+    message: "Enforce architecture rules in AI-generated code?",
+    initialValue: true,
+  })
+  if (p.isCancel(enforceArch)) return process.exit(0) as never
+
+  const preserveIdentity = await p.confirm({
+    message: "Preserve design identity in AI-generated UI?",
+    initialValue: true,
+  })
+  if (p.isCancel(preserveIdentity)) return process.exit(0) as never
+
   return {
     projectName: projectName as string,
+    projectType: pt,
     style: style as string,
     domains: domains as InitAnswers["domains"],
+    frontend: frontendVal,
+    frontendType: frontendTypeVal,
+    backend: backendVal,
+    orm: ormVal,
+    stylingSystem: stylingSystemVal,
+    designPhilosophy: designPhilosophyVal,
+    avoidGenericLayouts: avoidGenericLayoutsVal,
+    componentArchitecture: componentArchVal,
+    componentOrganization: componentOrgVal,
+    separateLogicAndUi: separateLogicVal,
+    enforceAccessibility: enforceA11yVal,
+    preventMassiveComponents: preventMassiveVal,
+    enforceVariantConsistency: enforceVariantsVal,
+    designSystemEnabled: dsEnabledVal,
+    designTokens: dsTokensVal,
+    designVariants: dsVariantsVal,
+    designMotion: dsMotionVal,
+    designTheme: dsThemeVal,
+    aiAgents: aiAgents as string[],
     autonomy: autonomy as string,
-    frontend: (frontendVal as string) || undefined,
-    backend: (backendVal as string) || undefined,
-    orm: ormVal || undefined,
+    enforceArchitecture: enforceArch as boolean,
+    preserveDesignIdentity: preserveIdentity as boolean,
     enforceBoundaries: enforceBoundaries as boolean,
     driftDetection: driftDetection as boolean,
     aiGovernance: aiGovernance as boolean,

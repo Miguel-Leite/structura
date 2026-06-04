@@ -61,6 +61,76 @@ describe("generateIR", () => {
   })
 })
 
+describe("generateIR with design/types config", () => {
+  const fullConfig: StructuraConfig = {
+    project: { name: "test-app", type: "fullstack-platform" },
+    architecture: { style: "modular-monolith" },
+    domains: [
+      { name: "web", path: "src/web" },
+      { name: "api", path: "src/api" },
+    ],
+    rules: { forbid_cross_domain_imports: true },
+    ai: {
+      autonomy: "hybrid",
+      agents: [
+        { id: "opencode", autonomy: "hybrid" },
+        { id: "cursor", autonomy: "guided" },
+      ],
+      rules: { enforce_architecture: true },
+    },
+    design: {
+      philosophy: "minimal",
+      constraints: { avoid_generic_ai_layouts: true, avoid_default_dashboard_patterns: true },
+    },
+    ui: { styling: "tailwindcss" },
+    frontend: { framework: "react", type: "application" },
+    components: {
+      architecture: "atomic-design",
+      organization: "by-feature",
+      rules: { separate_logic_and_ui: true, prevent_massive_components: true, max_lines: 150 },
+    },
+    design_system: { enabled: true, tokens: true, variants: true, motion: true, theme: true },
+  }
+
+  it("should generate uiDesign from config", () => {
+    const ir = generateIR(fullConfig)
+    expect(ir.uiDesign).toBeDefined()
+    expect(ir.uiDesign?.projectType).toBe("fullstack-platform")
+    expect(ir.uiDesign?.frontendType).toBe("application")
+    expect(ir.uiDesign?.designPhilosophy).toBe("minimal")
+    expect(ir.uiDesign?.stylingSystem).toBe("tailwindcss")
+    expect(ir.uiDesign?.componentArchitecture).toBe("atomic-design")
+    expect(ir.uiDesign?.componentOrganization).toBe("by-feature")
+    expect(ir.uiDesign?.componentRules?.separateLogicAndUi).toBe(true)
+    expect(ir.uiDesign?.componentRules?.maxLines).toBe(150)
+    expect(ir.uiDesign?.designSystem?.tokens).toBe(true)
+    expect(ir.uiDesign?.designSystem?.motion).toBe(true)
+    expect(ir.uiDesign?.designConstraints?.avoidGenericAiLayouts).toBe(true)
+  })
+
+  it("should generate multiAgent policies", () => {
+    const ir = generateIR(fullConfig)
+    expect(ir.multiAgent).toBeDefined()
+    expect(ir.multiAgent?.agents).toHaveLength(2)
+    expect(ir.multiAgent?.agents[0]?.id).toBe("opencode")
+    expect(ir.multiAgent?.agents[0]?.autonomy).toBe("hybrid")
+    expect(ir.multiAgent?.agents[1]?.id).toBe("cursor")
+    expect(ir.multiAgent?.agents[1]?.autonomy).toBe("guided")
+  })
+
+  it("should set projectType on meta", () => {
+    const ir = generateIR(fullConfig)
+    expect(ir.meta.projectType).toBe("fullstack-platform")
+  })
+
+  it("should not produce uiDesign when config has no design fields", () => {
+    const ir = generateIR(validConfig)
+    expect(ir.uiDesign).toBeUndefined()
+    expect(ir.multiAgent).toBeUndefined()
+    expect(ir.meta.projectType).toBeUndefined()
+  })
+})
+
 describe("serializeIR / deserializeIR", () => {
   it("should round-trip IR through JSON", () => {
     const ir = generateIR(validConfig)

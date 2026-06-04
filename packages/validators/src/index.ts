@@ -1,4 +1,7 @@
 export { ForbiddenCrossDomainImportRule } from "./forbidden-cross-domain-import.js"
 export { MaxFileLinesRule } from "./max-file-lines.js"
 export { NoCircularDependenciesRule } from "./no-circular-dependencies.js"
+export { SeparateLogicAndUiRule } from "./separate-logic-and-ui.js"
+export { PreventMassiveComponentsRule } from "./prevent-massive-components.js"
+export { ComponentNamingConventionRule } from "./component-naming-convention.js"
 export { registerBuiltinRules } from "./register.js"

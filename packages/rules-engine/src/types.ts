@@ -13,7 +13,7 @@ export interface RuleResult {
   suggestedFix?: string
 }
 
-export type RuleCategory = "import" | "naming" | "structure" | "dependency" | "ai"
+export type RuleCategory = "import" | "naming" | "structure" | "dependency" | "ai" | "component"
 
 export interface ParsedSourceSummary {
   filePath: string
