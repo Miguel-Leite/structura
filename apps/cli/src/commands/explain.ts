@@ -1,39 +1,24 @@
 import { createCommand } from "commander"
 import * as p from "@clack/prompts"
 import pc from "picocolors"
-import { findConfigPath, readConfig } from "@structura/config"
 import { generateIR } from "@structura/ir"
 import { DependencyGraph } from "@structura/graph"
+import { ensureConfig } from "../utils/config.js"
 
 export const explainCommand = createCommand("explain")
   .argument("<domain>", "Domain ID to explain")
   .option("--impact", "Show transitive closure (impact analysis)")
   .option("--json", "Output as JSON")
+  .option("--auto", "Auto-generate config if missing (non-interactive)")
   .description("Show detailed information about a domain")
-  .action(async (domainId: string, options: { impact?: boolean; json?: boolean }) => {
+  .action(async (domainId: string, options: { impact?: boolean; json?: boolean; auto?: boolean }) => {
     p.intro(pc.bold(`structura explain ${domainId}`))
-
     const s = p.spinner()
 
     s.start("Finding configuration")
-    const configPath = findConfigPath(process.cwd())
-    if (!configPath) {
-      s.stop("Config not found")
-      p.outro(`${pc.red("✖")} No structura.yml found.`)
-      process.exit(1)
-    }
-    s.stop(`Found ${pc.cyan(configPath)}`)
-
-    s.start("Reading config and generating IR")
-    const configResult = readConfig(configPath)
-    if (!configResult.ok) {
-      s.stop("Config validation failed")
-      p.outro(`${pc.red("✖")} ${configResult.error.message}`)
-      process.exit(1)
-    }
+    const { config } = await ensureConfig({ auto: options.auto })
     s.stop("Config loaded")
 
-    const config = configResult.value
     const ir = generateIR(config)
     const graph = DependencyGraph.fromIR(ir)
 

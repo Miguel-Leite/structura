@@ -1,44 +1,25 @@
 import { createCommand } from "commander"
 import * as p from "@clack/prompts"
 import pc from "picocolors"
-import { findConfigPath, readConfig } from "@structura/config"
 import { generateIR } from "@structura/ir"
 import { DependencyGraph } from "@structura/graph"
 import { parseProject } from "@structura/parser"
 import { Registry, Engine } from "@structura/rules-engine"
 import { registerBuiltinRules } from "@structura/validators"
+import { ensureConfig } from "../utils/config.js"
 
 export const checkCommand = createCommand("check")
   .description("Validate architecture against declared rules")
   .option("-s, --strict", "Treat warnings as errors")
   .option("-v, --verbose", "Show detailed output")
-  .action(async (options: { strict?: boolean; verbose?: boolean }) => {
+  .option("--auto", "Auto-generate config if missing (non-interactive)")
+  .action(async (options: { strict?: boolean; verbose?: boolean; auto?: boolean }) => {
     p.intro(pc.bold("structura check"))
-
     const s = p.spinner()
 
     s.start("Finding configuration")
-    const configPath = findConfigPath(process.cwd())
-    if (!configPath) {
-      s.stop("Config not found")
-      p.outro(
-        `${pc.red("✖")} No structura.yml found.\n` +
-          `  Run ${pc.cyan("structura init")} to create one.`,
-      )
-      process.exit(1)
-    }
-    s.stop(`Found ${pc.cyan(configPath)}`)
-
-    s.start("Reading and validating config")
-    const configResult = readConfig(configPath)
-    if (!configResult.ok) {
-      s.stop("Config validation failed")
-      p.outro(`${pc.red("✖")} ${configResult.error.message}`)
-      process.exit(1)
-    }
-    s.stop("Config validated")
-
-    const config = configResult.value
+    const { config, configPath } = await ensureConfig({ auto: options.auto })
+    s.stop(`Config: ${pc.cyan(configPath)}`)
 
     s.start("Generating Architecture IR")
     const ir = generateIR(config)

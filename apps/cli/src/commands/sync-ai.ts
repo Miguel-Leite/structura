@@ -1,11 +1,11 @@
 import { createCommand } from "commander"
 import * as p from "@clack/prompts"
 import pc from "picocolors"
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs"
+import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { findConfigPath, readConfig } from "@structura/config"
 import { generateIR } from "@structura/ir"
 import type { ArchitectureIR } from "@structura/ir"
+import { ensureConfig } from "../utils/config.js"
 
 const STRUCTURA_MARKER_START = "<!-- STRUCTURA:ARCHITECTURE -->"
 const STRUCTURA_MARKER_END = "<!-- /STRUCTURA:ARCHITECTURE -->"
@@ -334,35 +334,20 @@ export const syncAiCommand = createCommand("sync-ai")
   .option("--all", "Generate all targets (default)")
   .option("--dry-run", "Show generated content without writing files")
   .option("--force", "Overwrite existing files")
+  .option("--auto", "Auto-generate config if missing (non-interactive)")
   .action(async (options: {
     cursor?: boolean; claude?: boolean; copilot?: boolean;
     opencode?: boolean; windsurf?: boolean; continue?: boolean;
     aider?: boolean; all?: boolean;
-    dryRun?: boolean; force?: boolean;
+    dryRun?: boolean; force?: boolean; auto?: boolean;
   }) => {
     p.intro(pc.bold("structura sync-ai"))
-
     const s = p.spinner()
 
     s.start("Finding configuration")
-    const configPath = findConfigPath(process.cwd())
-    if (!configPath) {
-      s.stop("Config not found")
-      p.outro(`${pc.red("✖")} No structura.yml found.`)
-      process.exit(1)
-    }
-    s.stop(`Found ${pc.cyan(configPath)}`)
-
-    s.start("Reading config and generating IR")
-    const configResult = readConfig(configPath)
-    if (!configResult.ok) {
-      s.stop("Config validation failed")
-      p.outro(`${pc.red("✖")} ${configResult.error.message}`)
-      process.exit(1)
-    }
+    const { config } = await ensureConfig({ auto: options.auto })
     s.stop("Config loaded")
 
-    const config = configResult.value
     const ir = generateIR(config)
 
     const explicitFlags = [

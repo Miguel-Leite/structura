@@ -1,41 +1,22 @@
 import { createCommand } from "commander"
 import * as p from "@clack/prompts"
 import pc from "picocolors"
-import { findConfigPath, readConfig } from "@structura/config"
 import { generateIR } from "@structura/ir"
 import { parseProject } from "@structura/parser"
 import { detectDrift } from "@structura/drift"
+import { ensureConfig } from "../utils/config.js"
 
 export const driftCommand = createCommand("drift")
   .description("Detect architectural drift between defined architecture and real code")
   .option("-v, --verbose", "Show detailed output")
-  .action(async (options: { verbose?: boolean }) => {
+  .option("--auto", "Auto-generate config if missing (non-interactive)")
+  .action(async (options: { verbose?: boolean; auto?: boolean }) => {
     p.intro(pc.bold("structura drift"))
-
     const s = p.spinner()
 
     s.start("Finding configuration")
-    const configPath = findConfigPath(process.cwd())
-    if (!configPath) {
-      s.stop("Config not found")
-      p.outro(
-        `${pc.red("✖")} No structura.yml found.\n` +
-          `  Run ${pc.cyan("structura init")} to create one.`,
-      )
-      process.exit(1)
-    }
-    s.stop(`Found ${pc.cyan(configPath)}`)
-
-    s.start("Reading and validating config")
-    const configResult = readConfig(configPath)
-    if (!configResult.ok) {
-      s.stop("Config validation failed")
-      p.outro(`${pc.red("✖")} ${configResult.error.message}`)
-      process.exit(1)
-    }
-    s.stop("Config validated")
-
-    const config = configResult.value
+    const { config } = await ensureConfig({ auto: options.auto })
+    s.stop("Config loaded")
 
     s.start("Generating Architecture IR")
     const ir = generateIR(config)
