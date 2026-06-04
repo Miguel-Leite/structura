@@ -3,11 +3,12 @@ import { join } from "node:path"
 import * as p from "@clack/prompts"
 import { createCommand } from "commander"
 import pc from "picocolors"
+import { scanProject } from "./init-scanner.js"
 
 function generateConfigYml(answers: {
   projectName: string
   style: string
-  domains: { name: string; path: string }[]
+  domains: { name: string; path: string; canAccess?: string[]; cannotAccess?: string[] }[]
   autonomy: string
   frontend?: string
   backend?: string
@@ -41,6 +42,12 @@ function generateConfigYml(answers: {
   for (const domain of answers.domains) {
     lines.push(`  - name: ${domain.name}`)
     lines.push(`    path: ${domain.path}`)
+    if (domain.canAccess && domain.canAccess.length > 0) {
+      lines.push(`    canAccess: [${domain.canAccess.join(", ")}]`)
+    }
+    if (domain.cannotAccess && domain.cannotAccess.length > 0) {
+      lines.push(`    cannotAccess: [${domain.cannotAccess.join(", ")}]`)
+    }
   }
 
   lines.push("")
@@ -54,7 +61,8 @@ function generateConfigYml(answers: {
 export const initCommand = createCommand("init")
   .description("Initialize Structura in your project")
   .option("-f, --force", "Overwrite existing structura.yml")
-  .action(async (options: { force?: boolean }) => {
+  .option("--manual", "Skip auto-scan and enter domains manually")
+  .action(async (options: { force?: boolean; manual?: boolean }) => {
     const configPath = join(process.cwd(), "structura.yml")
 
     if (existsSync(configPath) && !options.force) {
@@ -70,8 +78,126 @@ export const initCommand = createCommand("init")
 
     p.intro(pc.bold("structura init"))
 
+    const s = p.spinner()
+
+    let domains: { name: string; path: string; canAccess?: string[]; cannotAccess?: string[] }[] = []
+
+    if (!options.manual) {
+      s.start("Scanning project structure")
+      const scanResult = scanProject(process.cwd())
+      s.stop(`Found ${scanResult.domains.length} domain(s)`)
+
+      if (scanResult.domains.length > 0) {
+        console.log(`\n${pc.bold("Discovered domains:")}`)
+        for (const d of scanResult.domains) {
+          const icon = d.detected ? pc.green("✓") : pc.dim("○")
+          console.log(`  ${icon} ${d.name} ${pc.dim(`(${d.path})`)}`)
+        }
+        console.log("")
+
+        const accept = await p.confirm({
+          message: "Accept these domains?",
+          initialValue: true,
+        })
+
+        if (p.isCancel(accept)) {
+          p.outro("Init cancelled.")
+          return
+        }
+
+        if (accept) {
+          domains = scanResult.domains.map((d) => ({
+            name: d.name.includes("/") ? d.name.split("/").pop() ?? d.name : d.name.replace(/^@[^/]+\//, ""),
+            path: d.path,
+          }))
+        }
+      }
+    }
+
+    if (domains.length === 0) {
+      while (true) {
+        const domainName = await p.text(
+          domains.length === 0
+            ? { message: "Domain name:", placeholder: "billing" }
+            : { message: `Domain name (#${domains.length + 1}):` },
+        )
+
+        if (p.isCancel(domainName)) {
+          p.outro("Init cancelled.")
+          return
+        }
+
+        if (!domainName) {
+          if (domains.length > 0) break
+          continue
+        }
+
+        const domainPath = await p.text({
+          message: `Path for "${domainName}":`,
+          placeholder: `src/${domainName}`,
+          defaultValue: `src/${domainName}`,
+        })
+
+        if (p.isCancel(domainPath)) {
+          p.outro("Init cancelled.")
+          return
+        }
+
+        domains.push({ name: domainName, path: domainPath })
+
+        const more = await p.confirm({
+          message: "Add another domain?",
+        })
+
+        if (p.isCancel(more) || !more) break
+      }
+
+      if (domains.length === 0) {
+        domains.push({ name: "app", path: "src/app" })
+      }
+    }
+
+    const configureRules = await p.confirm({
+      message: "Configure access rules between domains?",
+      initialValue: domains.length > 1,
+    })
+
+    if (p.isCancel(configureRules)) {
+      p.outro("Init cancelled.")
+      return
+    }
+
+    if (configureRules) {
+      for (let i = 0; i < domains.length; i++) {
+        const domain = domains[i]!
+        const others = domains.filter((_, idx) => idx !== i)
+
+        if (others.length === 0) continue
+
+        const cannotAccess = await p.multiselect({
+          message: `Which domains should "${domain.name}" NOT access?`,
+          options: others.map((d) => ({ value: d.name, label: d.name })),
+          required: false,
+        })
+
+        if (p.isCancel(cannotAccess)) {
+          p.outro("Init cancelled.")
+          return
+        }
+
+        if (cannotAccess && cannotAccess.length > 0) {
+          domain.cannotAccess = cannotAccess as string[]
+          domain.canAccess = others
+            .filter((d) => !(cannotAccess as string[]).includes(d.name))
+            .map((d) => d.name)
+        } else {
+          domain.canAccess = others.map((d) => d.name)
+        }
+      }
+    }
+
     const projectName = await p.text({
-      message: "What is your project name?",
+      message: "Project name:",
       placeholder: "my-app",
       defaultValue: "my-app",
     })
@@ -103,95 +229,12 @@ export const initCommand = createCommand("init")
       return
     }
 
-    const frontend = await p.select({
-      message: "Frontend framework:",
-      options: [
-        { value: "", label: "None", hint: "No frontend" },
-        { value: "nextjs", label: "Next.js" },
-        { value: "react", label: "React (Vite)" },
-      ],
-    })
-
-    if (p.isCancel(frontend)) {
-      p.outro("Init cancelled.")
-      return
-    }
-
-    const backend = await p.select({
-      message: "Backend framework:",
-      options: [
-        { value: "", label: "None", hint: "No backend" },
-        { value: "nestjs", label: "NestJS" },
-        { value: "express", label: "Express" },
-      ],
-    })
-
-    if (p.isCancel(backend)) {
-      p.outro("Init cancelled.")
-      return
-    }
-
-    const domains: { name: string; path: string }[] = []
-
-    while (true) {
-      const domainName = await p.text(
-        domains.length === 0
-          ? { message: "Domain name:", placeholder: "billing" }
-          : { message: `Domain name (#${domains.length + 1}):` },
-      )
-
-      if (p.isCancel(domainName)) {
-        p.outro("Init cancelled.")
-        return
-      }
-
-      if (!domainName) {
-        if (domains.length > 0) break
-        continue
-      }
-
-      const domainPath = await p.text({
-        message: `Path for "${domainName}":`,
-        placeholder: `src/${domainName}`,
-        defaultValue: `src/${domainName}`,
-      })
-
-      if (p.isCancel(domainPath)) {
-        p.outro("Init cancelled.")
-        return
-      }
-
-      domains.push({ name: domainName, path: domainPath })
-
-      const more = await p.confirm({
-        message: "Add another domain?",
-      })
-
-      if (p.isCancel(more) || !more) break
-    }
-
-    if (domains.length === 0) {
-      domains.push({ name: "app", path: "src/app" })
-    }
-
     const autonomy = await p.select({
       message: "AI agent autonomy level:",
       options: [
-        {
-          value: "constrained",
-          label: "Constrained",
-          hint: "Strict rules — recommended",
-        },
-        {
-          value: "guided",
-          label: "Guided",
-          hint: "Can suggest but not violate",
-        },
-        {
-          value: "supervised",
-          label: "Supervised",
-          hint: "Experimental — free but reports violations",
-        },
+        { value: "constrained", label: "Constrained", hint: "Strict rules — recommended" },
+        { value: "guided", label: "Guided", hint: "Can suggest but not violate" },
+        { value: "supervised", label: "Supervised", hint: "Experimental — free but reports violations" },
       ],
     })
 
@@ -200,7 +243,6 @@ export const initCommand = createCommand("init")
       return
     }
 
-    const s = p.spinner()
     s.start("Generating structura.yml")
 
     const content = generateConfigYml({
@@ -208,8 +250,6 @@ export const initCommand = createCommand("init")
       style: style as string,
       domains,
       autonomy: autonomy as string,
-      frontend: (frontend as string) || undefined,
-      backend: (backend as string) || undefined,
     })
 
     writeFileSync(configPath, content, "utf-8")
