@@ -5,6 +5,7 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { generateIR } from "@structura/ir"
 import type { ArchitectureIR } from "@structura/ir"
+import type { AIAgentId } from "@structura/config"
 import { ensureConfig } from "../utils/config.js"
 
 const STRUCTURA_MARKER_START = "<!-- STRUCTURA:ARCHITECTURE -->"
@@ -421,17 +422,20 @@ export const syncAiCommand = createCommand("sync-ai")
 
     const ir = generateIR(config)
 
+    const configuredAgents = ir.multiAgent?.agents?.map((a) => a.id) ?? []
+
     const explicitFlags = [
       options.cursor, options.claude, options.copilot,
       options.opencode, options.windsurf, options.continue,
       options.aider,
     ]
     const hasExplicitTarget = explicitFlags.some(Boolean)
-    const all = options.all ?? !hasExplicitTarget
 
     const selected = generators.filter((g) => {
-      if (all) return true
-      return options[g.id as keyof typeof options] === true
+      if (options.all) return true
+      if (hasExplicitTarget) return options[g.id as keyof typeof options] === true
+      if (configuredAgents.length > 0) return configuredAgents.includes(g.id as AIAgentId)
+      return true
     })
 
     if (selected.length === 0) {
